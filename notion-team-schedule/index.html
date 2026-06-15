@@ -65,10 +65,6 @@
     .shift-pill { display: inline-block; background: rgba(116,58,237,0.08); color: #743AED; border-radius: 6px; padding: 3px 10px; font-size: 12px; font-weight: 500; }
     .shift-pill.active-shift { background: rgba(145,255,215,0.2); color: #0a6040; }
     .shift-hrs { font-size: 11px; color: #bbb; margin-top: 2px; }
-    .loading-state { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 3rem; color: rgba(245,244,246,0.4); font-size: 13px; }
-    .loading-dot { width: 6px; height: 6px; border-radius: 50%; background: #91FFD7; animation: pulse 1.2s infinite; }
-    .loading-dot:nth-child(2) { animation-delay: 0.2s; }
-    .loading-dot:nth-child(3) { animation-delay: 0.4s; }
     .error-state { padding: 2rem 1.5rem; color: #999; font-size: 13px; text-align: center; }
     @media (max-width: 560px) {
       .body { flex-direction: column; }
@@ -89,10 +85,10 @@
     </div>
     <div class="header-controls">
       <select id="tz" onchange="renderCard()">
-        <option value="CDT">CDT — Chicago (UTC-5)</option>
-        <option value="BRT">BRT — São Paulo (UTC-3)</option>
-        <option value="CEST">CEST — Malta (UTC+2)</option>
-        <option value="PHT">PHT — Manila (UTC+8)</option>
+        <option value="America/Chicago" selected>Chicago</option>
+        <option value="America/Sao_Paulo">São Paulo</option>
+        <option value="Europe/Malta">Malta</option>
+        <option value="Asia/Manila">Manila</option>
         <option value="UTC">UTC</option>
       </select>
       <button class="online-btn" onclick="checkOnline()">
@@ -104,11 +100,7 @@
     <div class="sidebar">
       <div class="sidebar-label">Members</div>
       <div id="sidebar-tabs">
-        <div class="loading-state">
-          <span class="loading-dot"></span>
-          <span class="loading-dot"></span>
-          <span class="loading-dot"></span>
-        </div>
+        <div style="padding:8px 6px;font-size:11px;color:rgba(245,244,246,0.3);">Loading...</div>
       </div>
     </div>
     <div class="main">
@@ -116,7 +108,7 @@
       <div id="card-area">
         <div class="card">
           <div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:2rem;color:#bbb;font-size:13px;">
-            Loading schedule from Google Sheets...
+            Loading schedule...
           </div>
         </div>
       </div>
@@ -126,29 +118,74 @@
 
 <script>
   // ─── CONFIG ───────────────────────────────────────────────────────────────
-  // Your Apps Script web app URL — add ?action=getSchedule to fetch schedule data
   const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbydHOmrs7BoJIjjoAAulyDYsfAhTXzktw66kmN5iAS2AGN-bpxXJlf4ERiTVIgdElo_mw/exec';
 
-  // Member appearance config keyed by name (matches sheet Name column exactly)
+  // Visual config keyed by name
   const MEMBER_CONFIG = {
-    'Yesenia': { color: '#8B9DC3', initials: 'YC' },
-    'Ollie':   { color: '#7BC87B', initials: 'OE' },
-    'Wemerson':{ color: '#6BC9A0', initials: 'WB' },
-    'Romer':   { color: '#E8C56A', initials: 'RP' },
-    'Mando':   { color: '#A89CC8', initials: 'MP' }
+    'Yesenia': { color: '#8B9DC3', initials: 'YC', location: 'CHI' },
+    'Ollie':   { color: '#7BC87B', initials: 'OE', location: 'EU — Malta' },
+    'Wemerson':{ color: '#6BC9A0', initials: 'WB', location: 'BRZ — São Paulo' },
+    'Romer':   { color: '#E8C56A', initials: 'RP', location: 'PH — Manila' },
+    'Mando':   { color: '#A89CC8', initials: 'MP', location: 'PH — Manila' }
   };
 
-  // Location labels keyed by name
-  const MEMBER_LOCATION = {
-    'Yesenia': 'CHI',
-    'Ollie':   'EU — Malta',
-    'Wemerson':'BRZ — São Paulo',
-    'Romer':   'PH — Manila',
-    'Mando':   'PH — Manila'
+  // IANA timezone names for each dropdown option
+  const TZ_IANA = {
+    'America/Chicago':    'America/Chicago',
+    'America/Sao_Paulo':  'America/Sao_Paulo',
+    'Europe/Malta':       'Europe/Malta',
+    'Asia/Manila':        'Asia/Manila',
+    'UTC':                'UTC'
   };
 
-  // UTC offsets for each timezone abbreviation
-  const TZ_OFFSETS = { CDT:-5, BRT:-3, CEST:2, PHT:8, UTC:0 };
+  // Short display labels for each IANA zone (updated dynamically for DST)
+  function getTZLabel(ianaZone) {
+    if (ianaZone === 'UTC') return 'UTC';
+    try {
+      const now = new Date();
+      // Extract the timezone abbreviation from a formatted date string
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: ianaZone,
+        timeZoneName: 'short'
+      }).formatToParts(now);
+      const abbr = parts.find(function(p) { return p.type === 'timeZoneName'; });
+      return abbr ? abbr.value : ianaZone;
+    } catch(e) { return ianaZone; }
+  }
+
+  // Get current UTC offset in hours for an IANA timezone (handles DST automatically)
+  function getUTCOffset(ianaZone) {
+    if (ianaZone === 'UTC') return 0;
+    try {
+      const now = new Date();
+      // Compare local time in that zone vs UTC
+      const utcDate  = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
+      const tzDate   = new Date(now.toLocaleString('en-US', { timeZone: ianaZone }));
+      return (tzDate - utcDate) / 3600000;
+    } catch(e) { return 0; }
+  }
+
+  // Update all dropdown option labels to show current TZ abbreviation and offset
+  function updateDropdownLabels() {
+    const sel = document.getElementById('tz');
+    if (!sel) return;
+    Array.from(sel.options).forEach(function(opt) {
+      const iana = opt.value;
+      if (iana === 'UTC') { opt.text = 'UTC'; return; }
+      const label = getTZLabel(iana);
+      const offset = getUTCOffset(iana);
+      const sign   = offset >= 0 ? '+' : '-';
+      const abs    = Math.abs(offset);
+      const names  = {
+        'America/Chicago':   'Chicago',
+        'America/Sao_Paulo': 'São Paulo',
+        'Europe/Malta':      'Malta',
+        'Asia/Manila':       'Manila'
+      };
+      opt.text = (names[iana] || iana) + ' — ' + label + ' (UTC' + sign + abs + ')';
+    });
+  }
+
   const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
   // ─── STATE ────────────────────────────────────────────────────────────────
@@ -156,65 +193,44 @@
   let activeMember = 0;
   let onlineSet = new Set();
 
-  // ─── SHEET → UTC CONVERSION ───────────────────────────────────────────────
-  // Sheet stores local hours (e.g. Ollie CEST 9→17). We convert to UTC for
-  // accurate "who's online now" checks regardless of viewer's timezone.
-  function localHourToUTC(hour, tzAbbr) {
-    const offset = TZ_OFFSETS[tzAbbr] || 0;
-    return hour - offset; // UTC = local - offset
-  }
-
-  // Build MEMBERS array from raw sheet rows
+  // ─── BUILD MEMBERS FROM SHEET ─────────────────────────────────────────────
+  // Sheet now stores times in UTC directly — no conversion needed.
   function buildMembers(rows) {
-    // Group rows by name, preserving order of first appearance
     const order = [];
     const grouped = {};
+
     rows.forEach(function(row) {
       const name = (row['Name'] || row['Name '] || '').toString().trim();
       if (!name) return;
-      if (!grouped[name]) {
-        grouped[name] = [];
-        order.push(name);
-      }
+      if (!grouped[name]) { grouped[name] = []; order.push(name); }
       grouped[name].push(row);
     });
 
     return order.map(function(name) {
       const personRows = grouped[name];
-      const tz = (personRows[0]['Timezone'] || '').toString().trim();
-      const cfg = MEMBER_CONFIG[name] || { color: '#999', initials: name.slice(0,2).toUpperCase() };
-      const loc = MEMBER_LOCATION[name] || tz;
+      const cfg = MEMBER_CONFIG[name] || { color:'#999', initials: name.slice(0,2).toUpperCase(), location: '' };
 
       const scheduleUTC = personRows.map(function(row) {
-        const day = (row['Day'] || '').toString().trim();
+        const day    = (row['Day'] || '').toString().trim();
         const offVal = (row['Off'] || '').toString().trim().toLowerCase();
         const startVal = row['Start '] !== undefined ? row['Start '] : row['Start'];
         const endVal   = row['End']   !== undefined ? row['End']   : row['End'];
 
-        // Mark as off if Off column says "off" or start is empty
         if (offVal === 'off' || startVal === '' || startVal === null || startVal === undefined) {
           return { day: day, off: true };
         }
 
-        const startLocal = parseFloat(startVal);
-        const endLocal   = parseFloat(endVal);
+        const startUTC = parseFloat(startVal);  // already UTC
+        const endUTC   = parseFloat(endVal);     // already UTC — use as-is (33, 31 etc for overnight)
 
-        // Handle overnight shifts: if end <= start, end is next-day (add 24)
-        const endAdjusted = endLocal <= startLocal ? endLocal + 24 : endLocal;
-
-        return {
-          day:   day,
-          start: localHourToUTC(startLocal, tz),
-          end:   localHourToUTC(endAdjusted, tz)
-        };
+        return { day: day, start: startUTC, end: endUTC };
       });
 
       return {
         name:        name,
-        location:    loc,
+        location:    cfg.location,
         color:       cfg.color,
         initials:    cfg.initials,
-        displayTZ:   tz,
         scheduleUTC: scheduleUTC
       };
     });
@@ -222,30 +238,28 @@
 
   // ─── FETCH FROM GOOGLE SHEETS ─────────────────────────────────────────────
   function loadSchedule() {
-    const url = SCRIPT_URL + '?action=getSchedule';
-    fetch(url)
+    fetch(SCRIPT_URL + '?action=getSchedule')
       .then(function(res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.json();
       })
       .then(function(data) {
         MEMBERS = buildMembers(data);
-        if (MEMBERS.length === 0) throw new Error('No members found in sheet');
+        if (!MEMBERS.length) throw new Error('No members found');
         activeMember = 0;
         renderSidebar();
         renderCard();
       })
       .catch(function(err) {
         console.error('Failed to load schedule:', err);
-        // Fall back to showing an error with retry option
         document.getElementById('sidebar-tabs').innerHTML =
           '<div style="padding:8px 6px;font-size:11px;color:rgba(245,244,246,0.3);">Could not load</div>';
         document.getElementById('card-area').innerHTML =
-          '<div class="card"><div class="error-state">' +
-          '<p style="margin-bottom:8px">Could not load schedule from Google Sheets.</p>' +
-          '<p style="font-size:12px;color:#bbb">Make sure your Apps Script has the <code>?action=getSchedule</code> route and is deployed as "Anyone can access".</p>' +
-          '<button onclick="loadSchedule()" style="margin-top:12px;padding:6px 14px;border-radius:8px;border:0.5px solid rgba(5,9,46,0.15);background:#fff;cursor:pointer;font-size:12px;">Retry</button>' +
-          '</div></div>';
+          '<div class="card"><div class="error-state">'
+          + '<p style="margin-bottom:8px">Could not load schedule from Google Sheets.</p>'
+          + '<p style="font-size:12px;color:#bbb">Make sure the Apps Script is deployed with <code>?action=getSchedule</code> and set to "Anyone can access".</p>'
+          + '<button onclick="loadSchedule()" style="margin-top:12px;padding:6px 14px;border-radius:8px;border:0.5px solid rgba(5,9,46,0.15);background:#fff;cursor:pointer;font-size:12px;">Retry</button>'
+          + '</div></div>';
       });
   }
 
@@ -256,7 +270,7 @@
   }
 
   function isOnline(member) {
-    const utcHour  = getNowUTC();
+    const utcHour   = getNowUTC();
     const utcDayIdx = new Date().getUTCDay();
     return member.scheduleUTC.some(function(s) {
       if (s.off) return false;
@@ -284,7 +298,7 @@
   function checkOnline() {
     onlineSet = new Set();
     MEMBERS.forEach(function(m, i) { if (isOnline(m)) onlineSet.add(i); });
-    const banner = document.getElementById('online-banner');
+    const banner  = document.getElementById('online-banner');
     const timeStr = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
     if (onlineSet.size === 0) {
       banner.innerHTML = '<div class="online-banner"><h3><span class="pulse" style="background:#aaa;animation:none"></span> Nobody online right now <span class="local-time">your local time: ' + timeStr + '</span></h3><p class="none-msg">Check back later or pick a timezone to see upcoming shifts.</p></div>';
@@ -321,11 +335,12 @@
 
   function renderCard() {
     if (!MEMBERS.length) return;
-    const m       = MEMBERS[activeMember];
-    const toTZ    = document.getElementById('tz').value;
-    const offset  = TZ_OFFSETS[toTZ];
+    const m        = MEMBERS[activeMember];
+    const ianaZone = document.getElementById('tz').value;
+    const offset   = getUTCOffset(ianaZone);
+    const tzLabel  = getTZLabel(ianaZone);
     const memberOnline = onlineSet.has(activeMember);
-    const utcNow  = getNowUTC();
+    const utcNow   = getNowUTC();
     const utcDayIdx = new Date().getUTCDay();
 
     let rows = '';
@@ -333,24 +348,24 @@
       if (s.off) {
         rows += '<div class="day-row"><span class="day-name">' + s.day + '</span><span class="day-off">off</span></div>';
       } else {
+        // s.start and s.end are already UTC — just apply the display offset
         const ds  = s.start + offset;
         const de  = s.end   + offset;
         const hrs = s.end   - s.start;
         const label = fmt(ds) + getDayNote(ds) + ' – ' + fmt(de) + getDayNote(de);
         const shiftDayIdx = DAYS.indexOf(s.day);
-        const nowAbs = utcDayIdx * 24 + utcNow;
+        const nowAbs  = utcDayIdx * 24 + utcNow;
         const isActive   = memberOnline && nowAbs >= shiftDayIdx * 24 + s.start && nowAbs < shiftDayIdx * 24 + s.end;
-        const activeRow  = isActive ? 'active-row'    : '';
-        const activePill = isActive ? 'active-shift'  : '';
+        const activeRow  = isActive ? 'active-row'   : '';
+        const activePill = isActive ? 'active-shift' : '';
         const dot        = isActive ? ' ●' : '';
         rows += '<div class="day-row ' + activeRow + '"><span class="day-name">' + s.day + '</span>'
               + '<div class="day-shift"><span class="shift-pill ' + activePill + '">' + label + dot + '</span>'
-              + '<div class="shift-hrs">' + hrs + ' hrs</div></div></div>';
+              + '<div class="shift-hrs">' + hrs + ' hrs · ' + tzLabel + '</div></div></div>';
       }
     });
 
-    const tzLabel = toTZ === m.displayTZ ? toTZ + ' (home)' : m.displayTZ + ' → ' + toTZ;
-    const badge   = memberOnline
+    const badge = memberOnline
       ? '<span class="online-badge"><span style="width:5px;height:5px;border-radius:50%;background:#0a6040;display:inline-block;margin-right:3px"></span>online</span>'
       : '';
 
@@ -366,6 +381,7 @@
   }
 
   // ─── INIT ─────────────────────────────────────────────────────────────────
+  updateDropdownLabels();
   loadSchedule();
 </script>
 </body>
