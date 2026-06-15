@@ -118,7 +118,7 @@
 
 <script>
   // ─── CONFIG ───────────────────────────────────────────────────────────────
-  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbydHOmrs7BoJIjjoAAulyDYsfAhTXzktw66kmN5iAS2AGN-bpxXJlf4ERiTVIgdElo_mw/exec';
+  const SCRIPT_URL = 'https://script.google.com/a/macros/coinflowlabs.app/s/AKfycbydHOmrs7BoJIjjoAAulyDYsfAhTXzktw66kmN5iAS2AGN-bpxXJlf4ERiTVIgdElo_mw/exec';
 
   // Visual config keyed by name
   const MEMBER_CONFIG = {
@@ -343,25 +343,60 @@
     const utcNow   = getNowUTC();
     const utcDayIdx = new Date().getUTCDay();
 
-    let rows = '';
+    // Group shifts by their LOCAL display day (may differ from UTC day when offset shifts the date)
+    // Key: display day name → array of shift objects to show under that day
+    const dayMap = {}; // ordered map: display day label → [{label, hrs, isActive}]
+    const dayOrder = []; // track insertion order
+
     m.scheduleUTC.forEach(function(s) {
+      const shiftDayIdx = DAYS.indexOf(s.day);
+      const nowAbs = utcDayIdx * 24 + utcNow;
+
       if (s.off) {
-        rows += '<div class="day-row"><span class="day-name">' + s.day + '</span><span class="day-off">off</span></div>';
+        // Only show "off" for the UTC day if no working shift gets mapped to that day
+        if (!dayMap[s.day]) { dayMap[s.day] = { off: true, shifts: [] }; dayOrder.push(s.day); }
+        return;
+      }
+
+      const ds  = s.start + offset; // local start hour (may be < 0 or ≥ 24)
+      const de  = s.end   + offset; // local end hour
+      const hrs = s.end   - s.start;
+
+      // Determine which LOCAL day the shift START falls on
+      const startDayOffset = Math.floor(ds / 24); // -1, 0, or 1
+      const displayDayIdx  = ((shiftDayIdx + startDayOffset) % 7 + 7) % 7;
+      const displayDay     = DAYS[displayDayIdx];
+
+      // Format times without "(next day)" notes — they're already on the right day label
+      const localStart = ((ds % 24) + 24) % 24;
+      const localEnd   = ((de % 24) + 24) % 24;
+      const endDayDiff = Math.floor(de / 24) - Math.floor(ds / 24);
+      const endNote    = endDayDiff > 0 ? ' (next day)' : endDayDiff < 0 ? ' (prev day)' : '';
+      const shiftLabel = fmt(localStart) + ' – ' + fmt(localEnd) + endNote;
+
+      const isActive = memberOnline && nowAbs >= shiftDayIdx * 24 + s.start && nowAbs < shiftDayIdx * 24 + s.end;
+
+      if (!dayMap[displayDay]) { dayMap[displayDay] = { off: false, shifts: [] }; dayOrder.push(displayDay); }
+      dayMap[displayDay].off = false;
+      dayMap[displayDay].shifts.push({ label: shiftLabel, hrs: hrs, isActive: isActive });
+    });
+
+    // Sort dayOrder by standard week order Sun–Sat, but keep the member's original day ordering
+    // (use the order shifts were encountered, which matches the sheet order)
+    let rows = '';
+    dayOrder.forEach(function(day) {
+      const entry = dayMap[day];
+      if (entry.off || entry.shifts.length === 0) {
+        rows += '<div class="day-row"><span class="day-name">' + day + '</span><span class="day-off">off</span></div>';
       } else {
-        // s.start and s.end are already UTC — just apply the display offset
-        const ds  = s.start + offset;
-        const de  = s.end   + offset;
-        const hrs = s.end   - s.start;
-        const label = fmt(ds) + getDayNote(ds) + ' – ' + fmt(de) + getDayNote(de);
-        const shiftDayIdx = DAYS.indexOf(s.day);
-        const nowAbs  = utcDayIdx * 24 + utcNow;
-        const isActive   = memberOnline && nowAbs >= shiftDayIdx * 24 + s.start && nowAbs < shiftDayIdx * 24 + s.end;
-        const activeRow  = isActive ? 'active-row'   : '';
-        const activePill = isActive ? 'active-shift' : '';
-        const dot        = isActive ? ' ●' : '';
-        rows += '<div class="day-row ' + activeRow + '"><span class="day-name">' + s.day + '</span>'
-              + '<div class="day-shift"><span class="shift-pill ' + activePill + '">' + label + dot + '</span>'
-              + '<div class="shift-hrs">' + hrs + ' hrs · ' + tzLabel + '</div></div></div>';
+        entry.shifts.forEach(function(sh) {
+          const activeRow  = sh.isActive ? 'active-row'   : '';
+          const activePill = sh.isActive ? 'active-shift' : '';
+          const dot        = sh.isActive ? ' ●' : '';
+          rows += '<div class="day-row ' + activeRow + '"><span class="day-name">' + day + '</span>'
+                + '<div class="day-shift"><span class="shift-pill ' + activePill + '">' + sh.label + dot + '</span>'
+                + '<div class="shift-hrs">' + sh.hrs + ' hrs · ' + tzLabel + '</div></div></div>';
+        });
       }
     });
 
