@@ -20,7 +20,6 @@
       padding: 2rem 1rem;
     }
     .app { width: 100%; max-width: 780px; background: #fff; border-radius: 16px; border: 0.5px solid rgba(5,9,46,0.1); overflow: hidden; display: flex; flex-direction: column; }
-
     /* ── Header ── */
     .header { background: #05092E; padding: 1.25rem 1.5rem; }
     .title-block { display: flex; flex-direction: column; gap: 2px; margin-bottom: 1.25rem; }
@@ -31,16 +30,14 @@
     .hbtn { border-radius: 8px; padding: 9px 16px; font-size: 13px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 7px; font-family: inherit; transition: opacity 0.15s; white-space: nowrap; }
     .hbtn:hover { opacity: 0.85; }
     .hbtn-online { background: #743AED; color: #fff; border: none; }
-    .hbtn-schedules { background: rgba(255,255,255,0.08); color: #F5F4F6; border: 0.5px solid rgba(255,255,255,0.2); }
-    .hbtn-schedules.active { background: rgba(255,255,255,0.16); border-color: rgba(255,255,255,0.4); }
+    .hbtn-secondary { background: rgba(255,255,255,0.08); color: #F5F4F6; border: 0.5px solid rgba(255,255,255,0.2); }
+    .hbtn-secondary.active { background: rgba(255,255,255,0.16); border-color: rgba(255,255,255,0.4); }
     .pulse { width: 7px; height: 7px; border-radius: 50%; background: #91FFD7; flex-shrink: 0; animation: pulse 2s infinite; }
     @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.35)} }
-
     /* ── Default empty state ── */
     .default-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; padding: 3.5rem 2rem; min-height: 320px; }
     .default-hint { font-size: 13px; color: #aaa; text-align: center; max-width: 360px; line-height: 1.6; }
-
-    /* ── Online panel ── */
+    /* ── Online panel / Today panel (shared list style) ── */
     .online-panel { padding: 1.25rem 1.5rem; border-bottom: 0.5px solid rgba(5,9,46,0.06); }
     .online-panel h3 { font-size: 12px; font-weight: 500; color: #666; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     .online-list { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -49,7 +46,12 @@
     .online-chip-dot { width: 6px; height: 6px; border-radius: 50%; background: #91FFD7; }
     .none-msg { font-size: 12px; color: #aaa; font-style: italic; }
     .local-time { font-size: 11px; color: #bbb; margin-left: auto; }
-
+    .today-list { display: flex; flex-direction: column; }
+    .today-row { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 8px 0; border-bottom: 0.5px solid rgba(5,9,46,0.05); cursor: pointer; background: none; border-left: none; border-right: none; border-top: none; width: 100%; text-align: left; font-family: inherit; color: inherit; }
+    .today-row:last-child { border-bottom: none; }
+    .today-row:hover { background: #F5F4F6; }
+    .today-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .today-name { min-width: 90px; font-weight: 500; color: #05092E; }
     /* ── Schedule view ── */
     .schedule-view { display: flex; flex: 1; min-height: 420px; }
     .sidebar { background: #05092E; width: 150px; flex-shrink: 0; padding: 1.25rem 0.875rem; display: flex; flex-direction: column; gap: 4px; border-right: 0.5px solid rgba(255,255,255,0.06); }
@@ -64,7 +66,6 @@
     .tz-bar { display: flex; align-items: center; gap: 8px; }
     .tz-bar label { font-size: 12px; color: #888; white-space: nowrap; }
     .tz-bar select { background: #fff; border: 0.5px solid rgba(5,9,46,0.15); border-radius: 8px; padding: 6px 10px; font-size: 12px; color: #05092E; font-family: inherit; cursor: pointer; outline: none; flex: 1; }
-
     /* ── Card ── */
     .card { background: #fff; border: 0.5px solid rgba(5,9,46,0.08); border-radius: 12px; padding: 1.25rem; flex: 1; }
     .card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 1rem; padding-bottom: 0.875rem; border-bottom: 0.5px solid rgba(5,9,46,0.06); }
@@ -83,7 +84,6 @@
     .shift-pill.active-shift { background: rgba(145,255,215,0.2); color: #0a6040; }
     .shift-hrs { font-size: 11px; color: #bbb; margin-top: 2px; }
     .error-state { padding: 2rem 1.5rem; color: #999; font-size: 13px; text-align: center; }
-
     @media (max-width: 560px) {
       .schedule-view { flex-direction: column; }
       .sidebar { width: 100%; flex-direction: row; flex-wrap: wrap; padding: 0.75rem; gap: 6px; border-right: none; border-bottom: 0.5px solid rgba(255,255,255,0.06); }
@@ -95,7 +95,6 @@
 </head>
 <body>
 <div class="app">
-
   <!-- Header: always visible -->
   <div class="header">
     <div class="title-block">
@@ -107,15 +106,18 @@
       <button class="hbtn hbtn-online" onclick="handleOnlineClick()">
         <span class="pulse"></span> Who's online now?
       </button>
-      <button class="hbtn hbtn-schedules" id="schedules-btn" onclick="handleSchedulesClick()">
+      <button class="hbtn hbtn-secondary" id="today-btn" onclick="handleTodayClick()">
+        &#128197; Today's schedule
+      </button>
+      <button class="hbtn hbtn-secondary" id="schedules-btn" onclick="handleSchedulesClick()">
         &#9776; Schedules
       </button>
     </div>
   </div>
-
   <!-- Online panel: shown when "Who's online?" clicked -->
   <div id="online-panel" style="display:none"></div>
-
+  <!-- Today panel: shown when "Today's schedule" clicked -->
+  <div id="today-panel" style="display:none"></div>
   <!-- Default empty state: shown until a button is clicked -->
   <div id="default-state" class="default-state">
     <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -124,9 +126,8 @@
       <circle cx="25" cy="16" r="4" stroke="#bbb" stroke-width="1.5"/>
       <path d="M8 30c0-4 3.13-7 7-7h10c3.87 0 7 3 7 7" stroke="#bbb" stroke-width="1.5" stroke-linecap="round"/>
     </svg>
-    <p class="default-hint">Click <strong>Who's online now?</strong> to see who's currently working, or <strong>Schedules</strong> to view the full team schedule.</p>
+    <p class="default-hint">Click <strong>Who's online now?</strong> to see who's currently working, <strong>Today's schedule</strong> for everyone's shift today, or <strong>Schedules</strong> to view the full team schedule.</p>
   </div>
-
   <!-- Schedule view: shown when "Schedules" clicked -->
   <div id="schedule-view" class="schedule-view" style="display:none">
     <div class="sidebar">
@@ -155,12 +156,9 @@
       </div>
     </div>
   </div>
-
 </div>
-
 <script>
   const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbydHOmrs7BoJIjjoAAulyDYsfAhTXzktw66kmN5iAS2AGN-bpxXJlf4ERiTVIgdElo_mw/exec';
-
   const MEMBER_CONFIG = {
     'Yesenia': { color: '#8B9DC3', initials: 'YC', location: 'CHI' },
     'Ollie':   { color: '#7BC87B', initials: 'OE', location: 'EU — Malta' },
@@ -168,14 +166,12 @@
     'Romer':   { color: '#E8C56A', initials: 'RP', location: 'PH — Manila' },
     'Mando':   { color: '#A89CC8', initials: 'MP', location: 'PH — Manila' }
   };
-
   const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-
   let MEMBERS = [];
   let activeMember = 0;
   let onlineSet = new Set();
-  let scheduleVisible = false;
-
+  // Single source of truth for which panel is showing: 'default' | 'online' | 'today' | 'schedule'
+  let currentView = 'default';
   // ─── TIMEZONE HELPERS ─────────────────────────────────────────────────────
   function getTZLabel(ianaZone) {
     if (ianaZone === 'UTC') return 'UTC';
@@ -185,7 +181,6 @@
       return abbr ? abbr.value : ianaZone;
     } catch(e) { return ianaZone; }
   }
-
   function getUTCOffset(ianaZone) {
     if (ianaZone === 'UTC') return 0;
     try {
@@ -195,7 +190,6 @@
       return (tzDate - utcDate) / 3600000;
     } catch(e) { return 0; }
   }
-
   function updateDropdownLabels() {
     const sel = document.getElementById('tz');
     if (!sel) return;
@@ -209,7 +203,6 @@
       opt.text = (names[iana] || iana) + ' — ' + lbl + ' (UTC' + sign + Math.abs(offset) + ')';
     });
   }
-
   // ─── BUILD MEMBERS ────────────────────────────────────────────────────────
   function buildMembers(rows) {
     const order = [], grouped = {};
@@ -235,7 +228,6 @@
       return { name, location: cfg.location, color: cfg.color, initials: cfg.initials, scheduleUTC };
     });
   }
-
   // ─── FETCH ────────────────────────────────────────────────────────────────
   function loadSchedule() {
     fetch(SCRIPT_URL + '?action=getSchedule')
@@ -256,44 +248,40 @@
           + '</div></div>';
       });
   }
-
+  // ─── VIEW SWITCHING — exactly one panel visible at a time ────────────────
+  function setView(view) {
+    currentView = view;
+    document.getElementById('default-state').style.display  = view === 'default'  ? 'flex'  : 'none';
+    document.getElementById('online-panel').style.display    = view === 'online'   ? 'block' : 'none';
+    document.getElementById('today-panel').style.display     = view === 'today'    ? 'block' : 'none';
+    document.getElementById('schedule-view').style.display   = view === 'schedule' ? 'flex'  : 'none';
+    document.getElementById('today-btn').classList.toggle('active', view === 'today');
+    document.getElementById('schedules-btn').classList.toggle('active', view === 'schedule');
+  }
   // ─── BUTTON HANDLERS ──────────────────────────────────────────────────────
   function handleOnlineClick() {
-    // Hide default state, keep schedule view as-is
-    document.getElementById('default-state').style.display = 'none';
+    if (currentView === 'online') { setView('default'); return; }
     checkOnline();
+    setView('online');
   }
-
+  function handleTodayClick() {
+    if (currentView === 'today') { setView('default'); return; }
+    renderToday();
+    setView('today');
+  }
   function handleSchedulesClick() {
-    document.getElementById('default-state').style.display = 'none';
-    document.getElementById('online-panel').style.display = 'none';
-
-    const view = document.getElementById('schedule-view');
-    const btn  = document.getElementById('schedules-btn');
-
-    if (scheduleVisible) {
-      // Toggle off
-      view.style.display = 'none';
-      btn.classList.remove('active');
-      scheduleVisible = false;
-      // Show default state again if nothing else is showing
-      document.getElementById('default-state').style.display = 'flex';
-    } else {
-      view.style.display = 'flex';
-      btn.classList.add('active');
-      scheduleVisible = true;
-      updateDropdownLabels();
-      renderSidebar();
-      renderCard();
-    }
+    if (currentView === 'schedule') { setView('default'); return; }
+    computeOnlineSet();
+    updateDropdownLabels();
+    renderSidebar();
+    renderCard();
+    setView('schedule');
   }
-
   // ─── ONLINE ───────────────────────────────────────────────────────────────
   function getNowUTC() {
     const n = new Date();
     return n.getUTCHours() + n.getUTCMinutes() / 60;
   }
-
   function isOnline(member) {
     const utcHour   = getNowUTC();
     const utcDayIdx = new Date().getUTCDay();
@@ -304,10 +292,12 @@
       return nowAbs >= shiftDayIdx * 24 + s.start && nowAbs < shiftDayIdx * 24 + s.end;
     });
   }
-
-  function checkOnline() {
+  function computeOnlineSet() {
     onlineSet = new Set();
     MEMBERS.forEach(function(m, i) { if (isOnline(m)) onlineSet.add(i); });
+  }
+  function checkOnline() {
+    computeOnlineSet();
     const panel   = document.getElementById('online-panel');
     const timeStr = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
     if (onlineSet.size === 0) {
@@ -319,23 +309,16 @@
       });
       panel.innerHTML = '<div class="online-panel"><h3><span class="pulse"></span> Online now <span class="local-time">your local time: ' + timeStr + '</span></h3><div class="online-list">' + chips + '</div></div>';
     }
-    panel.style.display = 'block';
-    if (scheduleVisible) { renderSidebar(); renderCard(); }
   }
-
-  // Clicking an online chip opens schedules view on that person
+  // Clicking an online/today row opens Schedules on that person
   function jumpToMember(i) {
     activeMember = i;
-    if (!scheduleVisible) {
-      document.getElementById('schedule-view').style.display = 'flex';
-      document.getElementById('schedules-btn').classList.add('active');
-      scheduleVisible = true;
-      updateDropdownLabels();
-    }
+    computeOnlineSet();
+    updateDropdownLabels();
     renderSidebar();
     renderCard();
+    setView('schedule');
   }
-
   // ─── SIDEBAR & CARD ───────────────────────────────────────────────────────
   function renderSidebar() {
     let html = '';
@@ -349,62 +332,58 @@
     });
     document.getElementById('sidebar-tabs').innerHTML = html;
   }
-
   function selectMember(i) {
     activeMember = i;
     renderSidebar();
     renderCard();
   }
-
   function fmt(h) {
     const norm = ((h % 24) + 24) % 24;
     const ampm = norm >= 12 ? 'pm' : 'am';
     const hr   = norm % 12 === 0 ? 12 : norm % 12;
     return hr + ampm;
   }
-
-  function renderCard() {
-    if (!MEMBERS.length) return;
-    const m        = MEMBERS[activeMember];
-    const ianaZone = document.getElementById('tz').value;
-    const offset   = getUTCOffset(ianaZone);
-    const tzLabel  = getTZLabel(ianaZone);
-    const memberOnline = onlineSet.has(activeMember);
-    const utcNow   = getNowUTC();
+  // Buckets a member's UTC-keyed weekly schedule into LOCAL calendar days for
+  // a given IANA zone (a shift can spill into the next/previous local day).
+  // Shared by renderCard (full week) and renderToday (just today's bucket).
+  function buildLocalDayMap(member, ianaZone) {
+    const offset    = getUTCOffset(ianaZone);
+    const utcNow    = getNowUTC();
     const utcDayIdx = new Date().getUTCDay();
-
+    const memberIdx = MEMBERS.indexOf(member);
     const dayMap = {}, dayOrder = [];
-
-    m.scheduleUTC.forEach(function(s) {
+    member.scheduleUTC.forEach(function(s) {
       const shiftDayIdx = DAYS.indexOf(s.day);
       const nowAbs = utcDayIdx * 24 + utcNow;
-
       if (s.off) {
         if (!dayMap[s.day]) { dayMap[s.day] = { off: true, shifts: [] }; dayOrder.push(s.day); }
         return;
       }
-
       const ds  = s.start + offset;
       const de  = s.end   + offset;
       const hrs = s.end   - s.start;
-
       const startDayOffset = Math.floor(ds / 24);
       const displayDayIdx  = ((shiftDayIdx + startDayOffset) % 7 + 7) % 7;
       const displayDay     = DAYS[displayDayIdx];
-
       const localStart = ((ds % 24) + 24) % 24;
       const localEnd   = ((de % 24) + 24) % 24;
       const endDayDiff = Math.floor(de / 24) - Math.floor(ds / 24);
       const endNote    = endDayDiff > 0 ? ' (next day)' : endDayDiff < 0 ? ' (prev day)' : '';
       const shiftLabel = fmt(localStart) + ' – ' + fmt(localEnd) + endNote;
-
-      const isActive = memberOnline && nowAbs >= shiftDayIdx * 24 + s.start && nowAbs < shiftDayIdx * 24 + s.end;
-
+      const isActive = onlineSet.has(memberIdx) && nowAbs >= shiftDayIdx * 24 + s.start && nowAbs < shiftDayIdx * 24 + s.end;
       if (!dayMap[displayDay]) { dayMap[displayDay] = { off: false, shifts: [] }; dayOrder.push(displayDay); }
       dayMap[displayDay].off = false;
       dayMap[displayDay].shifts.push({ label: shiftLabel, hrs, isActive });
     });
-
+    return { dayMap, dayOrder };
+  }
+  function renderCard() {
+    if (!MEMBERS.length) return;
+    const m        = MEMBERS[activeMember];
+    const ianaZone = document.getElementById('tz').value;
+    const tzLabel  = getTZLabel(ianaZone);
+    const memberOnline = onlineSet.has(activeMember);
+    const { dayMap, dayOrder } = buildLocalDayMap(m, ianaZone);
     let rows = '';
     dayOrder.forEach(function(day) {
       const entry = dayMap[day];
@@ -421,11 +400,9 @@
         });
       }
     });
-
     const badge = memberOnline
       ? '<span class="online-badge"><span style="width:5px;height:5px;border-radius:50%;background:#0a6040;display:inline-block;margin-right:3px"></span>online</span>'
       : '';
-
     document.getElementById('card-area').innerHTML =
       '<div class="card">'
       + '<div class="card-header">'
@@ -436,7 +413,41 @@
       + '<div class="day-grid">' + rows + '</div>'
       + '</div>';
   }
+  // ─── TODAY'S SCHEDULE ─────────────────────────────────────────────────────
+  // Everyone's shift for the present calendar day, viewed in the browser's
+  // own detected timezone — a quick "who's doing what today" reference.
+  function renderToday() {
+    if (!MEMBERS.length) return;
+    computeOnlineSet();
+    const ianaZone  = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    const tzLabel   = getTZLabel(ianaZone);
+    const dateLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    const todayName = DAYS[new Date().getDay()];
 
+    let rows = '';
+    MEMBERS.forEach(function(m, i) {
+      const { dayMap } = buildLocalDayMap(m, ianaZone);
+      const entry  = dayMap[todayName];
+      const online = onlineSet.has(i);
+      const badge  = online
+        ? '<span class="online-badge"><span style="width:5px;height:5px;border-radius:50%;background:#0a6040;display:inline-block;margin-right:3px"></span>online</span>'
+        : '';
+      if (!entry || entry.off || entry.shifts.length === 0) {
+        rows += '<button class="today-row" onclick="jumpToMember(' + i + ')"><span class="today-dot" style="background:' + m.color + '"></span><span class="today-name">' + m.name + '</span><span class="day-off">Off today</span></button>';
+      } else {
+        entry.shifts.forEach(function(sh) {
+          const pillClass = sh.isActive ? 'active-shift' : '';
+          rows += '<button class="today-row" onclick="jumpToMember(' + i + ')"><span class="today-dot" style="background:' + m.color + '"></span><span class="today-name">' + m.name + badge + '</span><span class="shift-pill ' + pillClass + '">' + sh.label + '</span></button>';
+        });
+      }
+    });
+
+    document.getElementById('today-panel').innerHTML =
+      '<div class="online-panel">'
+      + '<h3><span class="pulse" style="background:#743AED"></span> Today — ' + dateLabel + ' <span class="local-time">' + tzLabel + '</span></h3>'
+      + '<div class="today-list">' + rows + '</div>'
+      + '</div>';
+  }
   // ─── INIT ─────────────────────────────────────────────────────────────────
   loadSchedule();
 </script>
