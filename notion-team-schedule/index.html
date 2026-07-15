@@ -172,6 +172,11 @@
   let onlineSet = new Set();
   // Single source of truth for which panel is showing: 'default' | 'online' | 'today' | 'schedule'
   let currentView = 'default';
+  // Becomes true once loadSchedule()'s fetch resolves. Clicking a button
+  // before this is true still opens the panel right away (with a loading
+  // message) instead of doing nothing — and the panel self-populates the
+  // moment data arrives, no extra click needed.
+  let dataLoaded = false;
   // ─── TIMEZONE HELPERS ─────────────────────────────────────────────────────
   function getTZLabel(ianaZone) {
     if (ianaZone === 'UTC') return 'UTC';
@@ -236,6 +241,12 @@
         MEMBERS = buildMembers(data);
         if (!MEMBERS.length) throw new Error('No members found');
         activeMember = 0;
+        dataLoaded = true;
+        // Whatever panel is already open (opened while data was still
+        // loading) gets populated immediately, without needing another click.
+        if (currentView === 'online') checkOnline();
+        else if (currentView === 'today') renderToday();
+        else if (currentView === 'schedule') { computeOnlineSet(); updateDropdownLabels(); renderSidebar(); renderCard(); }
       })
       .catch(function(err) {
         console.error('Failed to load schedule:', err);
@@ -259,22 +270,32 @@
     document.getElementById('schedules-btn').classList.toggle('active', view === 'schedule');
   }
   // ─── BUTTON HANDLERS ──────────────────────────────────────────────────────
+  function loadingHTML(msg) {
+    return '<div class="online-panel"><p class="none-msg">' + msg + '</p></div>';
+  }
   function handleOnlineClick() {
-    if (currentView === 'online') { setView('default'); return; }
-    checkOnline();
+    if (currentView === 'online' && dataLoaded) { setView('default'); return; }
+    if (dataLoaded) checkOnline();
+    else document.getElementById('online-panel').innerHTML = loadingHTML('Loading schedule…');
     setView('online');
   }
   function handleTodayClick() {
-    if (currentView === 'today') { setView('default'); return; }
-    renderToday();
+    if (currentView === 'today' && dataLoaded) { setView('default'); return; }
+    if (dataLoaded) renderToday();
+    else document.getElementById('today-panel').innerHTML = loadingHTML('Loading schedule…');
     setView('today');
   }
   function handleSchedulesClick() {
-    if (currentView === 'schedule') { setView('default'); return; }
-    computeOnlineSet();
-    updateDropdownLabels();
-    renderSidebar();
-    renderCard();
+    if (currentView === 'schedule' && dataLoaded) { setView('default'); return; }
+    if (dataLoaded) {
+      computeOnlineSet();
+      updateDropdownLabels();
+      renderSidebar();
+      renderCard();
+    } else {
+      document.getElementById('sidebar-tabs').innerHTML = '<div style="padding:8px 6px;font-size:11px;color:rgba(245,244,246,0.3);">Loading…</div>';
+      document.getElementById('card-area').innerHTML = '<div class="card"><div style="display:flex;align-items:center;justify-content:center;padding:2rem;color:#bbb;font-size:13px;">Loading schedule…</div></div>';
+    }
     setView('schedule');
   }
   // ─── ONLINE ───────────────────────────────────────────────────────────────
